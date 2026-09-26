@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Slotwell — Appointment Scheduler</title>
+<style>
+  :root{
+    --ink:#152238;
+    --paper:#ffffff;
+    --panel:#ffffff;
+    --line:#d7e2f0;
+    --teal:#1d5fd6;
+    --teal-deep:#123f9c;
+    --amber:#2f7fd1;
+    --muted:#6b7a91;
+    box-sizing:border-box;
+    padding-top:env(safe-area-inset-top,0px);
+    padding-bottom:env(safe-area-inset-bottom,0px);
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --ink:#eaf0fb; --paper:#0d1526; --panel:#121c33; --line:#233257; --muted:#8fa0c2;
+    }
+  }
+  :root[data-theme="dark"]{
+    --ink:#eaf0fb; --paper:#0d1526; --panel:#121c33; --line:#233257; --muted:#8fa0c2;
+  }
+  *{box-sizing:border-box;}
+  html{scroll-padding-top:env(safe-area-inset-top,0px);}
+  body{
+    margin:0; background:var(--paper); color:var(--ink);
+    font-family:"Iowan Old Style","Palatino Linotype",Georgia,serif;
+    min-height:100%;
+  }
+  .wrap{max-width:760px; margin:0 auto; padding:28px 20px 60px;}
+  header{display:flex; justify-content:space-between; align-items:baseline; gap:12px; flex-wrap:wrap; margin-bottom:22px;}
+  h1{font-size:1.7rem; font-weight:600; margin:0; letter-spacing:.2px;}
+  h1 span{color:var(--teal);}
+  .tagline{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; font-size:.85rem; color:var(--muted); margin-top:4px;}
+  nav{display:flex; gap:6px; background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:4px;}
+  nav button{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    border:none; background:transparent; color:var(--muted); padding:8px 16px;
+    border-radius:7px; font-size:.88rem; cursor:pointer; transition:background .15s,color .15s;
+  }
+  nav button.active{background:var(--teal); color:#fff;}
+  section{display:none;}
+  section.active{display:block;}
+  .card{background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:20px;}
+  .card + .card{margin-top:16px;}
+  h2{font-size:1.05rem; margin:0 0 14px; font-weight:600;}
+  form.add-slot{display:grid; grid-template-columns:1fr 1fr 1fr auto; gap:10px; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;}
+  @media (max-width:560px){ form.add-slot{grid-template-columns:1fr 1fr;} }
+  label{font-size:.72rem; color:var(--muted); display:block; margin-bottom:4px; text-transform:none;}
+  input, select{
+    width:100%; padding:8px 10px; border:1px solid var(--line); border-radius:7px;
+    background:var(--paper); color:var(--ink); font-size:.9rem;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  }
+  input:focus, select:focus, button:focus-visible{outline:2px solid var(--teal); outline-offset:1px;}
+  .add-slot button{
+    align-self:end; background:var(--teal); color:#fff; border:none; border-radius:7px;
+    padding:9px 16px; font-size:.9rem; cursor:pointer; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  }
+  .add-slot button:hover{background:var(--teal-deep);}
+  ul.slot-list{list-style:none; margin:0; padding:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;}
+  ul.slot-list li{
+    display:flex; justify-content:space-between; align-items:center; gap:10px;
+    padding:11px 4px; border-bottom:1px solid var(--line); font-size:.92rem;
+  }
+  ul.slot-list li:last-child{border-bottom:none;}
+  .who{color:var(--muted); font-size:.82rem;}
+  .status{font-size:.72rem; padding:3px 9px; border-radius:20px; font-weight:600; white-space:nowrap;}
+  .status.open{background:rgba(47,111,102,.13); color:var(--teal);}
+  .status.booked{background:rgba(201,138,58,.16); color:var(--amber);}
+  button.mini{
+    border:1px solid var(--line); background:transparent; color:var(--ink); border-radius:6px;
+    padding:6px 12px; font-size:.8rem; cursor:pointer; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  }
+  button.mini:hover{border-color:var(--teal); color:var(--teal);}
+  button.mini.danger:hover{border-color:#b23b3b; color:#b23b3b;}
+  .empty{color:var(--muted); font-size:.9rem; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; padding:6px 4px;}
+  .doctor-group h3{
+    font-size:.95rem; margin:22px 0 8px; padding-top:14px; border-top:1px solid var(--line);
+  }
+  .doctor-group:first-child h3{border-top:none; margin-top:0; padding-top:0;}
+  input[type="text"].name-input{max-width:220px;}
+  .field-doctor select{max-width:260px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Slot<span>well</span></h1>
+      <div class="tagline">A simple two-sided scheduler — doctors open slots, patients pick one.</div>
+    </div>
+    <nav>
+      <button id="tab-doctor" class="active">Doctor</button>
+      <button id="tab-patient">Patient</button>
+    </nav>
+  </header>
+
+  <section id="view-doctor" class="active">
+    <div class="card">
+      <h2>Open a new slot</h2>
+      <form class="add-slot" id="slot-form">
+        <div class="field-doctor">
+          <label for="doc-name">Doctor</label>
+          <input id="doc-name" class="name-input" type="text" placeholder="Dr. Mehta" required>
+        </div>
+        <div>
+          <label for="doc-date">Date</label>
+          <input id="doc-date" type="date" required>
+        </div>
+        <div>
+          <label for="doc-time">Time</label>
+          <input id="doc-time" type="time" required>
+        </div>
+        <button type="submit">Add slot</button>
+      </form>
+    </div>
+
+    <div class="card">
+      <h2>All slots by doctor</h2>
+      <div id="doctor-slots"></div>
+    </div>
+  </section>
+
+  <section id="view-patient">
+    <div class="card">
+      <h2>Available slots</h2>
+      <ul class="slot-list" id="patient-open"></ul>
+    </div>
+    <div class="card">
+      <h2>Your booked appointments</h2>
+      <ul class="slot-list" id="patient-booked"></ul>
+    </div>
+  </section>
+</div>
+
+<script>
+(function(){
+  const STORAGE_KEY = 'slotwell-slots-v1';
+  let slots = [];
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    slots = raw ? JSON.parse(raw) : seed();
+  } catch(e){ slots = seed(); }
+
+  function seed(){
+    return [
+      {id:cryptoId(), doctor:'Dr. Mehta', date: nextDate(1), time:'10:00', status:'open', patient:null},
+      {id:cryptoId(), doctor:'Dr. Mehta', date: nextDate(1), time:'10:30', status:'open', patient:null},
+      {id:cryptoId(), doctor:'Dr. Rao', date: nextDate(2), time:'15:00', status:'open', patient:null}
+    ];
+  }
+  function nextDate(days){
+    const d = new Date(); d.setDate(d.getDate()+days);
+    return d.toISOString().slice(0,10);
+  }
+  function cryptoId(){ return 'id-'+Math.random().toString(36).slice(2,10); }
+
+  function save(){
+    try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(slots)); }catch(e){}
+  }
+  function fmtDate(iso){
+    const d = new Date(iso+'T00:00:00');
+    return d.toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric'});
+  }
+  function fmtTime(t){
+    const [h,m] = t.split(':').map(Number);
+    const am = h < 12; const hh = ((h+11)%12)+1;
+    return hh+':'+String(m).padStart(2,'0')+' '+(am?'AM':'PM');
+  }
+
+  // ---- tabs ----
+  const tabDoctor = document.getElementById('tab-doctor');
+  const tabPatient = document.getElementById('tab-patient');
+  const viewDoctor = document.getElementById('view-doctor');
+  const viewPatient = document.getElementById('view-patient');
+  tabDoctor.addEventListener('click', ()=>switchTab('doctor'));
+  tabPatient.addEventListener('click', ()=>switchTab('patient'));
+  function switchTab(which){
+    const isDoc = which==='doctor';
+    tabDoctor.classList.toggle('active', isDoc);
+    tabPatient.classList.toggle('active', !isDoc);
+    viewDoctor.classList.toggle('active', isDoc);
+    viewPatient.classList.toggle('active', !isDoc);
+    if(!isDoc) renderPatient();
+  }
+
+  // ---- doctor form ----
+  document.getElementById('slot-form').addEventListener('submit', function(e){
+    e.preventDefault();
+    const doctor = document.getElementById('doc-name').value.trim();
+    const date = document.getElementById('doc-date').value;
+    const time = document.getElementById('doc-time').value;
+    if(!doctor || !date || !time) return;
+    slots.push({id:cryptoId(), doctor, date, time, status:'open', patient:null});
+    save();
+    renderDoctor();
+    this.reset();
+    document.getElementById('doc-name').value = doctor; // keep doctor name for quick repeat entry
+  });
+
+  function removeSlot(id){
+    slots = slots.filter(s=>s.id!==id);
+    save(); renderDoctor(); renderPatient();
+  }
+
+  function renderDoctor(){
+    const holder = document.getElementById('doctor-slots');
+    if(slots.length===0){
+      holder.innerHTML = '<div class="empty">No slots yet — add one above.</div>';
+      return;
+    }
+    const byDoc = {};
+    slots.slice().sort((a,b)=> (a.date+a.time).localeCompare(b.date+b.time))
+      .forEach(s=>{ (byDoc[s.doctor] = byDoc[s.doctor]||[]).push(s); });
+
+    holder.innerHTML = Object.keys(byDoc).sort().map(doc=>{
+      const items = byDoc[doc].map(s=>{
+        const statusLabel = s.status==='open' ? 'Open' : 'Booked';
+        const who = s.status==='booked' ? `<span class="who">${escapeHtml(s.patient||'a patient')}</span>` : '';
+        return `<li>
+          <span>${fmtDate(s.date)} · ${fmtTime(s.time)} ${who}</span>
+          <span style="display:flex;align-items:center;gap:10px;">
+            <span class="status ${s.status}">${statusLabel}</span>
+            <button class="mini danger" data-remove="${s.id}">Remove</button>
+          </span>
+        </li>`;
+      }).join('');
+      return `<div class="doctor-group"><h3>${escapeHtml(doc)}</h3><ul class="slot-list">${items}</ul></div>`;
+    }).join('');
+
+    holder.querySelectorAll('[data-remove]').forEach(btn=>{
+      btn.addEventListener('click', ()=>removeSlot(btn.getAttribute('data-remove')));
+    });
+  }
+
+  // ---- patient side ----
+  function bookSlot(id){
+    const name = window.prompt('Your name, for the booking:');
+    if(name===null) return;
+    const s = slots.find(x=>x.id===id);
+    if(!s || s.status!=='open') return;
+    s.status = 'booked';
+    s.patient = name.trim() || 'Patient';
+    save(); renderPatient(); renderDoctor();
+  }
+  function cancelBooking(id){
+    const s = slots.find(x=>x.id===id);
+    if(!s) return;
+    s.status = 'open'; s.patient = null;
+    save(); renderPatient(); renderDoctor();
+  }
+
+  function renderPatient(){
+    const openList = document.getElementById('patient-open');
+    const bookedList = document.getElementById('patient-booked');
+    const open = slots.filter(s=>s.status==='open').sort((a,b)=>(a.date+a.time).localeCompare(b.date+b.time));
+    const booked = slots.filter(s=>s.status==='booked').sort((a,b)=>(a.date+a.time).localeCompare(b.date+b.time));
+
+    openList.innerHTML = open.length ? open.map(s=>`
+      <li>
+        <span>${escapeHtml(s.doctor)} — ${fmtDate(s.date)} · ${fmtTime(s.time)}</span>
+        <button class="mini" data-book="${s.id}">Book</button>
+      </li>`).join('') : '<li class="empty">No open slots right now — check back later.</li>';
+
+    bookedList.innerHTML = booked.length ? booked.map(s=>`
+      <li>
+        <span>${escapeHtml(s.doctor)} — ${fmtDate(s.date)} · ${fmtTime(s.time)} <span class="who">${escapeHtml(s.patient||'')}</span></span>
+        <button class="mini danger" data-cancel="${s.id}">Cancel</button>
+      </li>`).join('') : '<li class="empty">Nothing booked yet.</li>';
+
+    openList.querySelectorAll('[data-book]').forEach(btn=>{
+      btn.addEventListener('click', ()=>bookSlot(btn.getAttribute('data-book')));
+    });
+    bookedList.querySelectorAll('[data-cancel]').forEach(btn=>{
+      btn.addEventListener('click', ()=>cancelBooking(btn.getAttribute('data-cancel')));
+    });
+  }
+
+  function escapeHtml(str){
+    return String(str).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+
+  renderDoctor();
+  renderPatient();
+})();
+</script>
+</body>
+</html>
